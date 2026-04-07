@@ -129,7 +129,7 @@ def select_action(
     # Force correct Gemini endpoint and key
     api_key = os.environ.get("OPENAI_API_KEY")
     api = client or OpenAI(api_key=api_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
-    model = os.environ.get("OPENAI_MODEL", "gemini-1.5-flash")
+    model = os.environ.get("OPENAI_MODEL", "gemini-2.5-flash")
 
     base_user_content = observation_to_prompt(obs)
     last_error: str | None = None
