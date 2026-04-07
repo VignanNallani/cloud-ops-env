@@ -8,8 +8,8 @@
 
 from typing import Any
 
-from .env import CloudOpsEnvironment
-from .models import CloudOpsAction, CloudOpsObservation, SecurityStatus, Server
+from cloud_ops_env.env import CloudOpsEnvironment
+from cloud_ops_env.models import CloudOpsAction, CloudOpsObservation, SecurityStatus, Server
 
 __all__ = [
     "CloudOpsAction",

@@ -10,7 +10,7 @@ Re-exports for OpenEnv package layout (schemas, client, FastAPI app).
 Implementation and graders live in `env.py`.
 """
 
-from .env import CloudOpsAction, CloudOpsObservation, SecurityStatus, Server
+from cloud_ops_env.models import CloudOpsAction, CloudOpsObservation, SecurityStatus, Server
 
 __all__ = [
     "CloudOpsAction",

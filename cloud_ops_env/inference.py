@@ -18,7 +18,7 @@ from typing import Any
 
 from openai import OpenAI
 
-from .env import CloudOpsAction, CloudOpsObservation, SecurityStatus
+from cloud_ops_env.env import CloudOpsAction, CloudOpsObservation, SecurityStatus
 
 
 SYSTEM_PROMPT = """You are a cloud operations and security auditor.
@@ -170,7 +170,7 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
     """Connect to a running OpenEnv server and roll out one greedy LLM episode (async loop)."""
     import asyncio
 
-    from .client import CloudOpsEnv
+    from cloud_ops_env.client import CloudOpsEnv
 
     async def _run() -> None:
         async with CloudOpsEnv(base_url=base_url) as env:

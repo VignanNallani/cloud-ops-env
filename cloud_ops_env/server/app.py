@@ -39,7 +39,7 @@ except Exception as e:  # pragma: no cover
 
 try:
     from cloud_ops_env.models import CloudOpsAction, CloudOpsObservation
-    from .cloud_ops_env_environment import CloudOpsEnvironment
+    from cloud_ops_env.server.cloud_ops_env_environment import CloudOpsEnvironment
 except ModuleNotFoundError:
     from models import CloudOpsAction, CloudOpsObservation
     from server.cloud_ops_env_environment import CloudOpsEnvironment

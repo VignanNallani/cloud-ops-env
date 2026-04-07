@@ -6,6 +6,6 @@
 
 """Cloud Ops Env environment server components."""
 
-from .cloud_ops_env_environment import CloudOpsEnvironment
+from cloud_ops_env.server.cloud_ops_env_environment import CloudOpsEnvironment
 
 __all__ = ["CloudOpsEnvironment"]

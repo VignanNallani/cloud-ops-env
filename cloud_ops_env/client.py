@@ -12,7 +12,7 @@ from openenv.core import EnvClient
 from openenv.core.client_types import StepResult
 from openenv.core.env_server.types import State
 
-from .models import CloudOpsAction, CloudOpsObservation
+from cloud_ops_env.models import CloudOpsAction, CloudOpsObservation
 
 
 class CloudOpsEnv(EnvClient[CloudOpsAction, CloudOpsObservation, State]):
