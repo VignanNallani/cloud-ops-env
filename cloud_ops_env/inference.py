@@ -126,9 +126,10 @@ def select_action(
     max_retries: int = 3,
 ) -> CloudOpsAction:
     """Call OpenAI and robustly return a validated action (self-correction)."""
-    api_base_url = os.environ.get("API_BASE_URL")
-    api = client or OpenAI(base_url=api_base_url) if api_base_url else OpenAI()
-    model = os.environ.get("OPENAI_MODEL", "gpt-3.5-turbo")
+    # Force correct Gemini endpoint and key
+    api_key = os.environ.get("OPENAI_API_KEY")
+    api = client or OpenAI(api_key=api_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+    model = os.environ.get("OPENAI_MODEL", "gemini-1.5-flash")
 
     base_user_content = observation_to_prompt(obs)
     last_error: str | None = None
