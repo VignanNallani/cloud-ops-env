@@ -317,12 +317,12 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
         error_str = str(error) if error else "null"
         print(f"[STEP] step={step} action={action} reward={reward_str} done={done_str} error={error_str}")
 
-    def log_end(success: bool, score: float, rewards: list[float]):
+    def log_end(success: bool, score: float, rewards: list[float], steps: int):
         """Log episode end in Scaler format."""
         success_str = str(success).lower()
-        score_str = f"{score:.2f}"
+        score_str = f"{score:.3f}"
         rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-        print(f"[END] success={success_str} score={score_str} rewards=[{rewards_str}]")
+        print(f"[END] success={success_str} steps={steps} score={score_str} rewards={rewards_str}")
 
     async def main():
         env = None
@@ -350,11 +350,11 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
                 if result.done:
                     break
             
-            log_end(result.done, total_reward, rewards)
+            log_end(result.done, total_reward, rewards, step_count)
             
         except Exception as e:
             # Log failure if any error occurs
-            log_end(False, 0.0, [])
+            log_end(False, 0.0, [], 0)
             raise e
         finally:
             if env:
