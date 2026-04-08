@@ -15,17 +15,147 @@ from __future__ import annotations
 import json
 import os
 import sys
-from typing import Any
+from enum import Enum
+from typing import Any, Dict, Literal
 
 from openai import OpenAI
+from openenv.core import EnvClient
+from openenv.core.client_types import StepResult
+from openenv.core.env_server.types import Action, Observation, State
+from pydantic import BaseModel, Field, model_validator
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-try:
-    from cloud_ops_env.env import CloudOpsAction, CloudOpsObservation, SecurityStatus
-except (ImportError, ModuleNotFoundError):
-    from env import CloudOpsAction, CloudOpsObservation, SecurityStatus
 
+# --- Copied Classes from env.py ---
+
+class SecurityStatus(str, Enum):
+    """Posture for SSH / port 22 exposure."""
+
+    SECURE = "secure"
+    SSH_EXPOSED_WORLD = "ssh_exposed_world"  # Port 22 bound to 0.0.0.0/0
+
+
+class Server(BaseModel):
+    """One fleet member (virtual server)."""
+
+    model_config = {"extra": "forbid", "validate_assignment": True}
+
+    id: str = Field(..., description="Stable server identifier")
+    cpu_utilization_percent: float = Field(
+        ..., ge=0.0, le=100.0, description="Current CPU utilization (%)"
+    )
+    hourly_cost_usd: float = Field(..., ge=0.0, description="Hourly cost (USD)")
+    security_status: SecurityStatus = Field(..., description="Security posture")
+    performance_units: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Abstract capacity used for cost-vs-performance ratio",
+    )
+    active: bool = Field(default=True, description="False if instance terminated")
+    ssh_listens_on: str = Field(
+        default="127.0.0.1",
+        description="Bind address for SSH (0.0.0.0 = world-reachable)",
+    )
+
+    @model_validator(mode="after")
+    def _ssh_consistent(self) -> Server:
+        if self.security_status == SecurityStatus.SSH_EXPOSED_WORLD:
+            if self.ssh_listens_on not in ("0.0.0.0", "0.0.0.0/0"):
+                self.ssh_listens_on = "0.0.0.0"
+        elif self.security_status == SecurityStatus.SECURE and self.ssh_listens_on in (
+            "0.0.0.0",
+            "0.0.0.0/0",
+        ):
+            self.security_status = SecurityStatus.SSH_EXPOSED_WORLD
+        return self
+
+
+TIER_SPECS: dict[str, tuple[float, float]] = {
+    "nano": (0.02, 12.0),
+    "standard": (0.06, 42.0),
+    "performance": (0.14, 110.0),
+}
+
+
+class CloudOpsAction(Action):
+    """Agent command for fleet operations."""
+
+    command: Literal[
+        "noop",
+        "terminate_server",
+        "fix_ssh_exposure",
+        "set_instance_tier",
+    ] = Field("noop", description="High-level operation")
+    server_id: str = Field(
+        default="",
+        description="Target server id for terminate / fix_ssh / set_instance_tier",
+    )
+    instance_tier: Literal["nano", "standard", "performance"] = Field(
+        "standard",
+        description="Tier for set_instance_tier (updates cost & performance units)",
+    )
+
+
+class CloudOpsObservation(Observation):
+    """Observable fleet state and grading hints."""
+
+    summary_message: str = Field(
+        default="", description="Short natural-language status for the agent"
+    )
+    servers: list[Server] = Field(default_factory=list, description="Current fleet")
+    current_cost_performance_ratio: float = Field(
+        default=0.0,
+        description="sum(hourly_cost) / sum(performance_units) over active servers",
+    )
+    target_cost_performance_ratio: float = Field(
+        default=0.0,
+        description="Hard objective: match this ratio within tolerance",
+    )
+    grader_scores: dict[str, float] = Field(
+        default_factory=dict,
+        description="Per-task achievement in [0, 1] (easy, medium, hard)",
+    )
+
+
+# --- Copied CloudOpsEnv class from client.py ---
+
+class CloudOpsEnv(EnvClient[CloudOpsAction, CloudOpsObservation, State]):
+    """
+    Client for the Cloud Ops & Security Auditor environment.
+
+    Example:
+        >>> async with CloudOpsEnv(base_url="http://localhost:8000") as client:
+        ...     r = await client.reset(seed=0)
+        ...     assert r.observation.servers
+    """
+
+    def _step_payload(self, action: CloudOpsAction) -> Dict[str, Any]:
+        return action.model_dump(mode="json")
+
+    def _parse_result(self, payload: Dict[str, Any]) -> StepResult[CloudOpsObservation]:
+        obs_data = payload.get("observation", {})
+        observation = CloudOpsObservation.model_validate(
+            {
+                **obs_data,
+                "done": payload.get("done", obs_data.get("done", False)),
+                "reward": payload.get("reward", obs_data.get("reward")),
+            }
+        )
+        return StepResult(
+            observation=observation,
+            reward=payload.get("reward"),
+            done=payload.get("done", False),
+        )
+
+    def _parse_state(self, payload: Dict[str, Any]) -> State:
+        return State(
+            episode_id=payload.get("episode_id"),
+            step_count=payload.get("step_count", 0),
+        )
+
+
+# --- Original inference.py code ---
 
 SYSTEM_PROMPT = """You are a cloud operations and security auditor.
 
@@ -175,11 +305,6 @@ def select_action(
 def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
     """Connect to a running OpenEnv server and roll out one greedy LLM episode (async loop)."""
     import asyncio
-
-    try:
-        from cloud_ops_env.client import CloudOpsEnv
-    except (ImportError, ModuleNotFoundError):
-        from client import CloudOpsEnv
 
     async def _run() -> None:
         async with CloudOpsEnv(base_url=base_url) as env:
