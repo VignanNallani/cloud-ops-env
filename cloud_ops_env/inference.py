@@ -14,11 +14,17 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from typing import Any
 
 from openai import OpenAI
 
-from cloud_ops_env.env import CloudOpsAction, CloudOpsObservation, SecurityStatus
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    from cloud_ops_env.env import CloudOpsAction, CloudOpsObservation, SecurityStatus
+except (ImportError, ModuleNotFoundError):
+    from env import CloudOpsAction, CloudOpsObservation, SecurityStatus
 
 
 SYSTEM_PROMPT = """You are a cloud operations and security auditor.
@@ -170,7 +176,10 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
     """Connect to a running OpenEnv server and roll out one greedy LLM episode (async loop)."""
     import asyncio
 
-    from cloud_ops_env.client import CloudOpsEnv
+    try:
+        from cloud_ops_env.client import CloudOpsEnv
+    except (ImportError, ModuleNotFoundError):
+        from client import CloudOpsEnv
 
     async def _run() -> None:
         async with CloudOpsEnv(base_url=base_url) as env:
