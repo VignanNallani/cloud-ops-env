@@ -306,26 +306,61 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
     """Connect to a running OpenEnv server and roll out one greedy LLM episode (async loop)."""
     import asyncio
 
-    async def _run() -> None:
-        async with CloudOpsEnv(base_url=base_url) as env:
+    def log_start():
+        """Log episode start in Scaler format."""
+        print("[START] task=cloud-ops-audit env=cloud-ops-env model=gemini-2.5-flash")
+
+    def log_step(step: int, action: str, reward: float, done: bool, error: str = None):
+        """Log step in Scaler format."""
+        done_str = str(done).lower()
+        reward_str = f"{reward:.2f}"
+        error_str = str(error) if error else "null"
+        print(f"[STEP] step={step} action={action} reward={reward_str} done={done_str} error={error_str}")
+
+    def log_end(success: bool, score: float, rewards: list[float]):
+        """Log episode end in Scaler format."""
+        success_str = str(success).lower()
+        score_str = f"{score:.2f}"
+        rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+        print(f"[END] success={success_str} score={score_str} rewards=[{rewards_str}]")
+
+    async def main():
+        env = None
+        try:
+            env = CloudOpsEnv(base_url=base_url)
             result = await env.reset(seed=seed)
-            episode_id = f"ep_{seed}_{hash(base_url) % 10000}"
-            print(f"[START] Episode {episode_id}")
-            print(f"[INIT] {result.observation.summary_message[:120]}")
             
+            log_start()
+            
+            rewards = []
             total_reward = 0
+            step_count = 0
+            
             for t in range(max_steps):
                 action = select_action(result.observation)
-                print(f"[STEP {t + 1}] Action: {action.command} | Server: {action.server_id} | Tier: {action.instance_tier}")
                 result = await env.step(action)
-                total_reward += result.reward
-                print(f"[STEP {t + 1}] Reward: {result.reward:.3f} | Cumulative: {total_reward:.3f} | Done: {result.done}")
+                
+                step_count = t + 1
+                reward = result.reward
+                total_reward += reward
+                rewards.append(reward)
+                
+                log_step(step_count, action.command, reward, result.done)
+                
                 if result.done:
                     break
             
-            print(f"[END] Final Score: {total_reward:.3f} | Steps: {t + 1}")
+            log_end(result.done, total_reward, rewards)
+            
+        except Exception as e:
+            # Log failure if any error occurs
+            log_end(False, 0.0, [])
+            raise e
+        finally:
+            if env:
+                await env.close()
 
-    asyncio.run(_run())
+    asyncio.run(main())
 
 
 if __name__ == "__main__":
