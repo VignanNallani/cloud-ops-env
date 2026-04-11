@@ -37,11 +37,14 @@ except Exception as e:  # pragma: no cover
         "openenv is required for the web interface. Install dependencies with '\n    pip install openenv\n'"
     ) from e
 
+# Import FastAPI for decorators
+from fastapi import FastAPI
+
 # Import classes from parent directory
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from inference import CloudOpsAction, CloudOpsObservation
+from inference import CloudOpsAction, CloudOpsObservation, run
 import env
 
 # Create the app with web interface and README integration
@@ -52,6 +55,17 @@ app = create_app(
     env_name="cloud_ops_env",
     max_concurrent_envs=1,  # increase this number to allow more concurrent WebSocket sessions
 )
+
+# Add custom reset endpoint to trigger inference logic
+@app.post('/reset')
+async def reset_endpoint():
+    """Reset endpoint that triggers inference logic."""
+    try:
+        # CRITICAL: Call run function to trigger inference logic
+        run(base_url='http://0.0.0.0:8000')
+        return {"status": "success", "message": "Inference triggered"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 def main(host: str = "0.0.0.0", port: int = 8000):
