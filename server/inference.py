@@ -22,7 +22,7 @@ from enum import Enum
 
 from openai import OpenAI
 
-# Line buffering at the top of the script
+# Line Buffering: Critical for real-time log streaming
 sys.stdout.reconfigure(line_buffering=True)
 
 # Check for required API key at script startup
@@ -384,10 +384,7 @@ def main():
 
 def run(base_url: str):
     """Run function that accepts base_url parameter for validator."""
-    # Bulletproof Output - line buffering as first action
-    sys.stdout.reconfigure(line_buffering=True)
-    
-    # The VERY FIRST action must be START tag
+    # The First Breath: START tag must be the VERY FIRST line
     task_name = os.getenv('TASK_NAME', 'cloud_ops')
     benchmark = os.getenv('BENCHMARK', 'default')
     model_name = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
@@ -396,7 +393,7 @@ def run(base_url: str):
     # Environment Variable Debug
     print(f"DEBUG: HF_TOKEN present: {bool(os.getenv('HF_TOKEN'))}", flush=True)
     
-    # The Shield - wrap entire logic in try...finally
+    # The Finally Shield - wrap entire logic in try...finally
     rewards_list = []
     total_steps = 0
     success = False
