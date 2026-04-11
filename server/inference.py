@@ -320,19 +320,20 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
         pass
 
     async def _run() -> None:
+        # Immediate start - print before connection
+        task_name = os.getenv('TASK_NAME', 'cloud_ops')
+        benchmark = os.getenv('BENCHMARK', 'default')
+        model_name = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
+        print(f'[START] task={task_name} env={benchmark} model={model_name}', flush=True)
+        sys.stdout.flush()
+        
+        rewards_list = []
+        total_steps = 0
+        success = False
+        
         try:
             async with CloudOpsEnv(base_url=base_url) as env:
                 result = await env.reset(seed=seed)
-                # Scaler stdout compliance
-                task_name = os.getenv('TASK_NAME', 'cloud_ops')
-                benchmark = os.getenv('BENCHMARK', 'default')
-                model_name = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
-                print(f'[START] task={task_name} env={benchmark} model={model_name}', flush=True)
-                sys.stdout.flush()
-                
-                rewards_list = []
-                total_steps = 0
-                success = False
                 
                 for t in range(max_steps):
                     try:
@@ -355,19 +356,13 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
                         rewards_list.append(0.0)
                         total_steps = t + 1
                         continue
-                
-                # Scaler stdout compliance
-                score = sum(rewards_list)
-                rewards_str = ",".join([f"{r:.2f}" for r in rewards_list])
-                print(f'[END] success={str(success).lower()} steps={total_steps} score={score:.2f} rewards={rewards_str}', flush=True)
-                sys.stdout.flush()
-                
-        except ConnectionError as conn_error:
-            # Connection failed
-            pass
-        except Exception as main_error:
-            # Episode failed
-            pass
+        
+        finally:
+            # End guarantee - always print regardless of outcome
+            score = sum(rewards_list)
+            rewards_str = ",".join([f"{r:.2f}" for r in rewards_list])
+            print(f'[END] success={str(success).lower()} steps={total_steps} score={score:.2f} rewards={rewards_str}', flush=True)
+            sys.stdout.flush()
 
     try:
         asyncio.run(_run())
@@ -389,4 +384,6 @@ def main():
 
 def run(base_url: str):
     """Run function that accepts base_url parameter for validator."""
+    # Line buffering for immediate output
+    sys.stdout.reconfigure(line_buffering=True)
     run_episode_demo(base_url)
