@@ -27,14 +27,14 @@ sys.stdout.reconfigure(line_buffering=True)
 
 # Direct system writes to bypass all buffering
 def log_tag(message):
-    sys.stdout.write(f'{message}\n')
+    sys.stdout.write(f'\n{message}\n')  # Added leading newline
     sys.stdout.flush()
 
 # Check for required API key at script startup
 api_key = os.getenv('HF_TOKEN') or os.getenv('OPENAI_API_KEY')
 if not api_key:
     # Resilient Auth - don't exit, just debug
-    print("DEBUG: HF_TOKEN or OPENAI_API_KEY not set, proceeding without API key")
+    log_tag(f"DEBUG: HF_TOKEN or OPENAI_API_KEY not set, proceeding without API key")
 
 
 class SecurityStatus(str, Enum):
@@ -170,7 +170,7 @@ def _parse_action_or_error(text: str) -> CloudOpsAction:
         data = json.loads(text)
         return CloudOpsAction(**data)
     except Exception as e:
-        print(f"Error parsing action: {e}")
+        log_tag(f"Error parsing action: {e}")
         return CloudOpsAction(command="noop", server_id="", instance_tier="standard")
 
 
@@ -389,11 +389,11 @@ def main():
 
 def run(base_url: str):
     """Run function that accepts base_url parameter for validator."""
-    # The First Breath: START tag must be the VERY FIRST line
+    # The First Breath: START tag must be VERY FIRST line
     task_name = os.getenv('TASK_NAME', 'cloud_ops')
     benchmark = os.getenv('BENCHMARK', 'default')
     model_name = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
-    log_tag(f'[START] task={task_name} env={benchmark} model={model_name}')
+    log_tag(f'[START] task=cloud_ops')  # Keep it simple as required
     
     # Environment Variable Debug
     print(f"DEBUG: HF_TOKEN present: {bool(os.getenv('HF_TOKEN'))}", flush=True)

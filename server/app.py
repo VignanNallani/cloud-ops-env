@@ -94,8 +94,8 @@ def main(host: str = "0.0.0.0", port: int = 8000):
     """
     import uvicorn
 
-    # Gold Standard: Use debug log level to ensure no logs are trapped
-    uvicorn.run(app, host=host, port=port, log_level="debug")
+    # Gold Standard: Disable all uvicorn and FastAPI default logging
+    uvicorn.run(app, host=host, port=port, log_config=None)
 
 
 if __name__ == "__main__":
