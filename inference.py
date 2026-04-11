@@ -22,9 +22,10 @@ from enum import Enum
 from openai import OpenAI
 
 # Check for required API key at script startup
-if not os.getenv('OPENAI_API_KEY'):
-    print("ERROR: OPENAI_API_KEY environment variable is required but not set.")
-    print("Please set your OpenAI API key: export OPENAI_API_KEY='your-key-here'")
+api_key = os.getenv('HF_TOKEN') or os.getenv('OPENAI_API_KEY')
+if not api_key:
+    print("ERROR: HF_TOKEN or OPENAI_API_KEY environment variable is required but not set.")
+    print("Please set your API key: export HF_TOKEN='your-key-here'")
     exit(1)
 
 
@@ -201,8 +202,8 @@ def select_action(
     max_retries: int = 3,
 ) -> CloudOpsAction:
     """Call OpenAI and robustly return a validated action (self-correction)."""
-    # Force correct Gemini endpoint and key
-    api_key = os.environ.get("OPENAI_API_KEY")
+    # Use HF_TOKEN as primary API key source
+    api_key = os.getenv('HF_TOKEN') or os.getenv('OPENAI_API_KEY')
     api = client or OpenAI(api_key=api_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
     model = os.environ.get("OPENAI_MODEL", "gemini-2.5-flash")
 
@@ -321,26 +322,40 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
         try:
             async with CloudOpsEnv(base_url=base_url) as env:
                 result = await env.reset(seed=seed)
-                episode_id = f"ep_{seed}_{hash(base_url) % 10000}"
-                print(f"[START] Episode {episode_id}")
-                print(f"[INIT] {result.observation.summary_message[:120]}")
+                # Scaler stdout compliance
+                task_name = os.getenv('TASK_NAME', 'cloud_ops')
+                benchmark = os.getenv('BENCHMARK', 'default')
+                model_name = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
+                print(f'[START] task={task_name} env={benchmark} model={model_name}')
                 
-                total_reward = 0
+                rewards_list = []
+                total_steps = 0
+                success = False
+                
                 for t in range(max_steps):
                     try:
                         action = select_action(result.observation)
-                        print(f"[STEP {t + 1}] Action: {action.command} | Server: {action.server_id} | Tier: {action.instance_tier}")
+                        action_str = f"{action.command}|{action.server_id}|{action.instance_tier}"
                         result = await env.step(action)
-                        total_reward += result.reward
-                        print(f"[STEP {t + 1}] Reward: {result.reward:.3f} | Cumulative: {total_reward:.3f} | Done: {result.done}")
+                        rewards_list.append(result.reward)
+                        total_steps = t + 1
+                        success = result.done
+                        # Scaler stdout compliance
+                        error = "false" if result.reward >= 0 else "negative_reward"
+                        print(f'[STEP] step={t+1} action={action_str} reward={result.reward:.2f} done={str(result.done).lower()} error={error}')
                         if result.done:
                             break
                     except Exception as step_error:
-                        print(f"[ERROR] Step {t + 1} failed: {step_error}")
-                        print(f"[ERROR] Continuing with next step...")
+                        error = "true"
+                        print(f'[STEP] step={t+1} action=error reward=0.00 done=false error={error}')
+                        rewards_list.append(0.0)
+                        total_steps = t + 1
                         continue
                 
-                print(f"[END] Final Score: {total_reward:.3f} | Steps: {t + 1}")
+                # Scaler stdout compliance
+                score = sum(rewards_list)
+                rewards_str = ",".join([f"{r:.2f}" for r in rewards_list])
+                print(f'[END] success={str(success).lower()} steps={total_steps} score={score:.2f} rewards={rewards_str}')
                 
         except ConnectionError as conn_error:
             print(f"[ERROR] Connection failed: {conn_error}")
