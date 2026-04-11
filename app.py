@@ -39,9 +39,10 @@ except Exception as e:  # pragma: no cover
 
 # Import FastAPI for decorators
 from fastapi import FastAPI
+import sys
+import asyncio
 
 # Import classes from parent directory
-import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from inference import CloudOpsAction, CloudOpsObservation, run
@@ -62,8 +63,14 @@ async def reset_endpoint():
     """Reset endpoint that triggers inference logic."""
     try:
         # CRITICAL: Call run function to trigger inference logic
-        run(base_url='http://0.0.0.0:8000')
-        return {"status": "success", "message": "Inference triggered"}
+        # Use asyncio to avoid blocking FastAPI event loop
+        await asyncio.to_thread(run, base_url='http://0.0.0.0:8000')
+        
+        # Gold Standard: Ensure all stdout/stderr is flushed immediately
+        sys.stdout.flush()
+        sys.stderr.flush()
+        
+        return {"status": "success", "message": "Inference triggered and flushed"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -87,7 +94,8 @@ def main(host: str = "0.0.0.0", port: int = 8000):
     """
     import uvicorn
 
-    uvicorn.run(app, host=host, port=port)
+    # Gold Standard: Use debug log level to ensure no logs are trapped
+    uvicorn.run(app, host=host, port=port, log_level="debug")
 
 
 if __name__ == "__main__":
