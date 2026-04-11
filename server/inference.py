@@ -25,19 +25,11 @@ from openai import OpenAI
 # Line Buffering: Critical for real-time log streaming
 sys.stdout.reconfigure(line_buffering=True)
 
-# Direct system writes to bypass all buffering
-def log_tag(message):
-    formatted = f'\n{message}\n'
-    sys.stdout.write(formatted)
-    sys.stderr.write(formatted)  # Write to stderr as backup
-    sys.stdout.flush()
-    sys.stderr.flush()
-
 # Check for required API key at script startup
 api_key = os.getenv('HF_TOKEN') or os.getenv('OPENAI_API_KEY')
 if not api_key:
     # Resilient Auth - don't exit, just debug
-    log_tag(f"DEBUG: HF_TOKEN or OPENAI_API_KEY not set, proceeding without API key")
+    print(f"DEBUG: HF_TOKEN or OPENAI_API_KEY not set, proceeding without API key", flush=True)
 
 
 class SecurityStatus(str, Enum):
@@ -173,7 +165,7 @@ def _parse_action_or_error(text: str) -> CloudOpsAction:
         data = json.loads(text)
         return CloudOpsAction(**data)
     except Exception as e:
-        log_tag(f"Error parsing action: {e}")
+        print(f"Error parsing action: {e}", flush=True)
         return CloudOpsAction(command="noop", server_id="", instance_tier="standard")
 
 
@@ -353,12 +345,12 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
                         success = result.done
                         # Scaler stdout compliance
                         error = "false" if result.reward >= 0 else "negative_reward"
-                        log_tag(f'[STEP] step={t+1} action={action_str} reward={result.reward:.2f} done={str(result.done).lower()} error={error}')
+                        print(f"[STEP] step={t+1} reward={result.reward:.2f}", flush=True)
                         if result.done:
                             break
                     except Exception as step_error:
                         error = "true"
-                        log_tag(f'[STEP] step={t+1} action=error reward=0.00 done=false error={error}')
+                        print(f"[STEP] step={t+1} action=error reward=0.00 done=false error={error}", flush=True)
                         rewards_list.append(0.0)
                         total_steps = t + 1
                         continue
@@ -369,8 +361,7 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
         
         # Always print END tag with actual episode results
         score = sum(rewards_list)
-        rewards_str = ",".join([f"{r:.2f}" for r in rewards_list])
-        log_tag(f'[END] success={str(success).lower()} steps={total_steps} score={score:.2f} rewards={rewards_str}')
+        print(f"[END] task=cloud_ops score={score:.2f} steps={total_steps}", flush=True)
 
     try:
         asyncio.run(_run())
@@ -393,10 +384,10 @@ def main():
 def run(base_url: str):
     """Run function that accepts base_url parameter for validator."""
     # The Immediate Step: START tag before any imports or complex logic
-    log_tag(f'[START] task=cloud_ops')  # Keep it simple as required
+    print(f"[START] task=cloud_ops", flush=True)
     
     # Environment Variable Debug
-    log_tag(f"DEBUG: HF_TOKEN present: {bool(os.getenv('HF_TOKEN'))}")
+    print(f"DEBUG: HF_TOKEN present: {bool(os.getenv('HF_TOKEN'))}", flush=True)
     
     # The Finally Shield - wrap entire logic in try...finally
     rewards_list = []
@@ -413,5 +404,4 @@ def run(base_url: str):
     finally:
         # Always print END tag with actual episode results
         score = sum(rewards_list)
-        rewards_str = ",".join([f"{r:.2f}" for r in rewards_list])
-        log_tag(f'[END] success={str(success).lower()} steps={total_steps} score={score:.2f} rewards={rewards_str}')
+        print(f"[END] task=cloud_ops score={score:.2f} steps={total_steps}", flush=True)
