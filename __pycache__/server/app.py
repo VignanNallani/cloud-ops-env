@@ -37,11 +37,10 @@ except Exception as e:  # pragma: no cover
         "openenv is required for the web interface. Install dependencies with '\n    pip install openenv\n'"
     ) from e
 
-# Import classes from parent directory
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Import classes directly from the same directory
 from inference import CloudOpsAction, CloudOpsObservation
+
+# Import environment class from env module
 import env
 
 # Create the app with web interface and README integration
