@@ -124,10 +124,13 @@ class CloudOpsObservation:
 
 SYSTEM_PROMPT = """You are a cloud operations and security auditor.
 
-Goal:
-1. Reduce cost/performance ratio by matching `target_cost_performance_ratio` using `set_instance_tier`.
-2. Fix security by eliminating world-reachable SSH exposure (port 22 bound to 0.0.0.0).
-3. Make the episode end by also completing the easy objective: terminate idle servers (CPU < 5%).
+CRITICAL PRIORITIES (execute in this exact order):
+
+Priority 1: If any server is ssh_exposed_world, you MUST use fix_ssh_exposure immediately. Security is the highest priority.
+
+Priority 2: If a server is idle (CPU < 5%), you MUST use terminate_server. Eliminate waste.
+
+Priority 3: Adjust the tier to match the target cost ratio. Optimize performance.
 
 World vs private exposure in this simulation:
 - `0.0.0.0` means the service is bound to all interfaces (world-reachable). This is insecure for SSH.
@@ -138,8 +141,8 @@ Available actions (pick exactly one per step):
 - `fix_ssh_exposure`: for servers currently showing SSH exposure (`security_status == "ssh_exposed_world"`)
 - `set_instance_tier`: set `instance_tier` to one of: "nano", "standard", "performance"
 
-Respond with a single JSON object only (no markdown, no extra text):
-{"command": "...", "server_id": "...", "instance_tier": "standard"}
+CRITICAL: Respond with RAW JSON only - NO markdown tags, NO ```json wrapper, NO extra text.
+Output format: {"command": "...", "server_id": "...", "instance_tier": "standard"}
 - Use empty string for `server_id` when using `noop`.
 - `instance_tier` is only used with `set_instance_tier` (still include it in the JSON).
 """
