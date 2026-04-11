@@ -2,7 +2,7 @@ spec_version: 1
 name: cloud-ops-env
 type: space
 runtime: fastapi
-app: app:app
+app: server.app:app
 port: 8000
 
 action_space: CloudOpsAction
