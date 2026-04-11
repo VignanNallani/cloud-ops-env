@@ -357,8 +357,14 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
         print(f"[ERROR] Async loop failed: {loop_error}")
 
 
-if __name__ == "__main__":
+def main():
+    """Main function that can be called by the validator."""
     import sys
-
+    
     url = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000"
     run_episode_demo(url)
+
+
+def run(base_url: str):
+    """Run function that accepts base_url parameter for validator."""
+    run_episode_demo(base_url)
