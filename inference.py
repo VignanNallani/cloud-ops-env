@@ -27,8 +27,11 @@ sys.stdout.reconfigure(line_buffering=True)
 
 # Direct system writes to bypass all buffering
 def log_tag(message):
-    sys.stdout.write(f'\n{message}\n')  # Added leading newline
+    formatted = f'\n{message}\n'
+    sys.stdout.write(formatted)
+    sys.stderr.write(formatted)  # Write to stderr as backup
     sys.stdout.flush()
+    sys.stderr.flush()
 
 # Check for required API key at script startup
 api_key = os.getenv('HF_TOKEN') or os.getenv('OPENAI_API_KEY')
@@ -389,14 +392,11 @@ def main():
 
 def run(base_url: str):
     """Run function that accepts base_url parameter for validator."""
-    # The First Breath: START tag must be VERY FIRST line
-    task_name = os.getenv('TASK_NAME', 'cloud_ops')
-    benchmark = os.getenv('BENCHMARK', 'default')
-    model_name = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
+    # The Immediate Step: START tag before any imports or complex logic
     log_tag(f'[START] task=cloud_ops')  # Keep it simple as required
     
     # Environment Variable Debug
-    print(f"DEBUG: HF_TOKEN present: {bool(os.getenv('HF_TOKEN'))}", flush=True)
+    log_tag(f"DEBUG: HF_TOKEN present: {bool(os.getenv('HF_TOKEN'))}")
     
     # The Finally Shield - wrap entire logic in try...finally
     rewards_list = []

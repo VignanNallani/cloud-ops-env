@@ -41,6 +41,13 @@ except Exception as e:  # pragma: no cover
 from fastapi import FastAPI
 import sys
 import asyncio
+import logging
+
+# Hijack the root logger to force output visibility
+logging.basicConfig(level=logging.DEBUG, force=True)
+
+# Confirm PYTHONUNBUFFERED=1 is set
+os.environ.setdefault('PYTHONUNBUFFERED', '1')
 
 # Import classes from parent directory
 import os
