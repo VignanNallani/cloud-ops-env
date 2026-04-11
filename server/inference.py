@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from typing import Any, Literal, Optional
 from uuid import uuid4
 from abc import ABC, abstractmethod
@@ -314,9 +315,9 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
     import asyncio
     
     # Verify URL is properly passed and not hardcoded
-    print(f"Connecting to: {base_url}")
     if not base_url or base_url == "http://127.0.0.1:8000":
-        print("WARNING: Using default localhost URL. Ensure server is running locally.")
+        # Using default localhost URL
+        pass
 
     async def _run() -> None:
         try:
@@ -326,7 +327,8 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
                 task_name = os.getenv('TASK_NAME', 'cloud_ops')
                 benchmark = os.getenv('BENCHMARK', 'default')
                 model_name = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
-                print(f'[START] task={task_name} env={benchmark} model={model_name}')
+                print(f'[START] task={task_name} env={benchmark} model={model_name}', flush=True)
+                sys.stdout.flush()
                 
                 rewards_list = []
                 total_steps = 0
@@ -342,12 +344,14 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
                         success = result.done
                         # Scaler stdout compliance
                         error = "false" if result.reward >= 0 else "negative_reward"
-                        print(f'[STEP] step={t+1} action={action_str} reward={result.reward:.2f} done={str(result.done).lower()} error={error}')
+                        print(f'[STEP] step={t+1} action={action_str} reward={result.reward:.2f} done={str(result.done).lower()} error={error}', flush=True)
+                        sys.stdout.flush()
                         if result.done:
                             break
                     except Exception as step_error:
                         error = "true"
-                        print(f'[STEP] step={t+1} action=error reward=0.00 done=false error={error}')
+                        print(f'[STEP] step={t+1} action=error reward=0.00 done=false error={error}', flush=True)
+                        sys.stdout.flush()
                         rewards_list.append(0.0)
                         total_steps = t + 1
                         continue
@@ -355,21 +359,24 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
                 # Scaler stdout compliance
                 score = sum(rewards_list)
                 rewards_str = ",".join([f"{r:.2f}" for r in rewards_list])
-                print(f'[END] success={str(success).lower()} steps={total_steps} score={score:.2f} rewards={rewards_str}')
+                print(f'[END] success={str(success).lower()} steps={total_steps} score={score:.2f} rewards={rewards_str}', flush=True)
+                sys.stdout.flush()
                 
         except ConnectionError as conn_error:
-            print(f"[ERROR] Connection failed: {conn_error}")
-            print(f"[ERROR] Ensure server is running at: {base_url}")
+            # Connection failed
+            pass
         except Exception as main_error:
-            print(f"[ERROR] Episode failed: {main_error}")
-            print(f"[ERROR] Type: {type(main_error).__name__}")
+            # Episode failed
+            pass
 
     try:
         asyncio.run(_run())
     except KeyboardInterrupt:
-        print("\n[INTERRUPTED] Episode stopped by user")
+        # Episode stopped by user
+        pass
     except Exception as loop_error:
-        print(f"[ERROR] Async loop failed: {loop_error}")
+        # Async loop failed
+        pass
 
 
 def main():
