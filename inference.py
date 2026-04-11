@@ -25,6 +25,11 @@ from openai import OpenAI
 # Line Buffering: Critical for real-time log streaming
 sys.stdout.reconfigure(line_buffering=True)
 
+# Direct system writes to bypass all buffering
+def log_tag(message):
+    sys.stdout.write(f'{message}\n')
+    sys.stdout.flush()
+
 # Check for required API key at script startup
 api_key = os.getenv('HF_TOKEN') or os.getenv('OPENAI_API_KEY')
 if not api_key:
@@ -345,12 +350,12 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
                         success = result.done
                         # Scaler stdout compliance
                         error = "false" if result.reward >= 0 else "negative_reward"
-                        print(f'[STEP] step={t+1} action={action_str} reward={result.reward:.2f} done={str(result.done).lower()} error={error}', flush=True)
+                        log_tag(f'[STEP] step={t+1} action={action_str} reward={result.reward:.2f} done={str(result.done).lower()} error={error}')
                         if result.done:
                             break
                     except Exception as step_error:
                         error = "true"
-                        print(f'[STEP] step={t+1} action=error reward=0.00 done=false error={error}', flush=True)
+                        log_tag(f'[STEP] step={t+1} action=error reward=0.00 done=false error={error}')
                         rewards_list.append(0.0)
                         total_steps = t + 1
                         continue
@@ -362,7 +367,7 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
         # Always print END tag with actual episode results
         score = sum(rewards_list)
         rewards_str = ",".join([f"{r:.2f}" for r in rewards_list])
-        print(f'[END] success={str(success).lower()} steps={total_steps} score={score:.2f} rewards={rewards_str}', flush=True)
+        log_tag(f'[END] success={str(success).lower()} steps={total_steps} score={score:.2f} rewards={rewards_str}')
 
     try:
         asyncio.run(_run())
@@ -388,7 +393,7 @@ def run(base_url: str):
     task_name = os.getenv('TASK_NAME', 'cloud_ops')
     benchmark = os.getenv('BENCHMARK', 'default')
     model_name = os.getenv('MODEL_NAME', 'gemini-2.5-flash')
-    print(f'[START] task={task_name} env={benchmark} model={model_name}', flush=True)
+    log_tag(f'[START] task={task_name} env={benchmark} model={model_name}')
     
     # Environment Variable Debug
     print(f"DEBUG: HF_TOKEN present: {bool(os.getenv('HF_TOKEN'))}", flush=True)
@@ -409,4 +414,4 @@ def run(base_url: str):
         # Always print END tag with actual episode results
         score = sum(rewards_list)
         rewards_str = ",".join([f"{r:.2f}" for r in rewards_list])
-        print(f'[END] success={str(success).lower()} steps={total_steps} score={score:.2f} rewards={rewards_str}', flush=True)
+        log_tag(f'[END] success={str(success).lower()} steps={total_steps} score={score:.2f} rewards={rewards_str}')

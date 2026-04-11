@@ -13,6 +13,9 @@ RUN pip install --no-cache-dir fastapi uvicorn openai openenv-core pydantic aioh
 # Copy all files from root
 COPY . .
 
+# Crucial: Set PYTHONUNBUFFERED=1 to bypass all buffering
+ENV PYTHONUNBUFFERED=1
+
 # Expose port
 EXPOSE 8000
 
