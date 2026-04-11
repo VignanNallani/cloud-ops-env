@@ -19,13 +19,13 @@ Endpoints:
 
 Usage:
     # Development (with auto-reload):
-    uvicorn server.app:app --reload --host 0.0.0.0 --port 8000
+    uvicorn app:app --reload --host 0.0.0.0 --port 8000
 
     # Production:
-    uvicorn server.app:app --host 0.0.0.0 --port 8000 --workers 4
+    uvicorn app:app --host 0.0.0.0 --port 8000 --workers 4
 
     # Or run directly:
-    python -m server.app
+    python app.py
 
 Direct execution calls ``main()`` with optional ``--port``.
 """
@@ -34,20 +34,18 @@ try:
     from openenv.core.env_server.http_server import create_app
 except Exception as e:  # pragma: no cover
     raise ImportError(
-        "openenv is required for the web interface. Install dependencies with '\n    uv sync\n'"
+        "openenv is required for the web interface. Install dependencies with '\n    pip install openenv\n'"
     ) from e
 
-try:
-    from cloud_ops_env.models import CloudOpsAction, CloudOpsObservation
-    from cloud_ops_env.server.cloud_ops_env_environment import CloudOpsEnvironment
-except ModuleNotFoundError:
-    from models import CloudOpsAction, CloudOpsObservation
-    from server.cloud_ops_env_environment import CloudOpsEnvironment
+# Import classes directly from the same directory
+from inference import CloudOpsAction, CloudOpsObservation
 
+# Import environment class from env module
+import env
 
 # Create the app with web interface and README integration
 app = create_app(
-    CloudOpsEnvironment,
+    env.CloudOpsEnvironment,
     CloudOpsAction,
     CloudOpsObservation,
     env_name="cloud_ops_env",
@@ -60,17 +58,17 @@ def main(host: str = "0.0.0.0", port: int = 8000):
     Entry point for direct execution via uv run or python -m.
 
     This function enables running the server without Docker:
-        uv run --project . server
-        uv run --project . server --port 8001
-        python -m cloud_ops_env.server.app
+        uv run --project . app
+        uv run --project . app --port 8001
+        python app.py
 
     Args:
         host: Host address to bind to (default: "0.0.0.0")
-        port: Port number to listen on (default: 8000)
+        port: Port number to listen to (default: 8000)
 
     For production deployments, consider using uvicorn directly with
     multiple workers:
-        uvicorn cloud_ops_env.server.app:app --workers 4
+        uvicorn app:app --workers 4
     """
     import uvicorn
 

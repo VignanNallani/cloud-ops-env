@@ -1,2 +1,0 @@
-[console_scripts]
-server = cloud_ops_env.server.app:main

@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 """
-Cloud Ops & Security Auditor — environment core.
+Cloud Ops & Security Auditor - environment core.
 
 Fleet management simulation with three graded objectives (easy / medium / hard).
 """
