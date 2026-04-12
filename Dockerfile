@@ -1,8 +1,7 @@
 FROM python:3.10-slim
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir fastapi uvicorn openai openenv-core pydantic aiohttp websockets
+RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 EXPOSE 8000
-# -u flag ensures zero Python buffering
-CMD ["python", "-u", "app.py"]
+CMD ["python", "app.py"]
