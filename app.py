@@ -18,13 +18,9 @@ app = create_app(
 # 2. Add the trigger endpoint with the mandatory [START] tag
 @app.post('/reset')
 async def reset_endpoint(request: dict = None):
-    # This MUST be the first line of output the validator sees
-    sys.stdout.write("[START] task=cloud_ops\n")
-    sys.stdout.flush()
-    
     try:
         # Run the agent (it connects to the WebSocket hosted above)
-        await asyncio.to_thread(run, base_url='http://0.0.0.0:8000')
+        await asyncio.to_thread(run, base_url='http://127.0.0.1:8000')
         return {"status": "success"}
     except Exception as e:
         return {"status": "error", "message": str(e)}

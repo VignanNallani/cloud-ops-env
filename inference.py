@@ -198,7 +198,8 @@ def select_action(
 async def run_logic(base_url: str):
     import aiohttp, websockets, asyncio
     
-    # [START] tag is already handled in app.py
+    # This is the first line reaching Hugging Face log window
+    print(f'[START] task=cloud_ops', flush=True)
     
     rewards = []
     steps = 0
@@ -206,13 +207,13 @@ async def run_logic(base_url: str):
     
     # SHARPEN: Retry loop to ensure the environment is ready
     ws = None
-    for attempt in range(5):
+    for attempt in range(10):
         try:
             ws_url = base_url.replace("http", "ws") + "/ws"
             ws = await websockets.connect(ws_url, open_timeout=10)
             break
         except Exception:
-            await asyncio.sleep(1) # Wait for server to breathe
+            await asyncio.sleep(2) # Wait for server to fully initialize
     
     if not ws:
         print(f'[END] task=cloud_ops score=0.00 steps=0 error=connection_failed', flush=True)
