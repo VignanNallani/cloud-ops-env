@@ -63,15 +63,24 @@ async def run_logic(base_url: str):
                             action_dict = {"command": "terminate_server", "server_id": s['id']}
                             break
 
-                # Priority 3: Ratio Matching (Hard Task - Using LLM if no direct action)
+                # Priority3: Ratio Matching (Hard Task - Using LLM for decision)
                 if action_dict["command"] == "noop" and servers:
-                    # Logic to trigger a tier change if ratio is off
+                    # Instead of hardcoded if/else, let's LLM decide the tier
                     curr = obs.get("current_cost_performance_ratio", 0)
                     tgt = obs.get("target_cost_performance_ratio", 0)
-                    if curr > tgt * 1.1:
-                        action_dict = {"command": "set_instance_tier", "server_id": servers[0]['id'], "instance_tier": "nano"}
-                    elif curr < tgt * 0.9:
-                        action_dict = {"command": "set_instance_tier", "server_id": servers[0]['id'], "instance_tier": "performance"}
+                    
+                    response = client.chat.completions.create(
+                        model=MODEL_NAME,
+                        messages=[{"role": "user", "content": f"Target ratio is {tgt:.2f}. Current is {curr:.2f}. Which tier (nano, standard, performance) should I pick? Respond with JSON only: {{'tier': '...'}}"}],
+                        max_tokens=50
+                    )
+                    
+                    try:
+                        llm_response = response.choices[0].message.content.strip()
+                        tier_decision = json.loads(llm_response).get("tier", "standard")
+                        action_dict = {"command": "set_instance_tier", "server_id": servers[0]['id'], "instance_tier": tier_decision}
+                    except:
+                        action_dict = {"command": "set_instance_tier", "server_id": servers[0]['id'], "instance_tier": "standard"}
                 # --- END OF AGGRESSIVE AGENT LOGIC ---
 
                 # Execute Step [cite: 26]
