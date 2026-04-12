@@ -1,46 +1,17 @@
-﻿# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
-"""
-LLM policy using the OpenAI client: maps observations to ``CloudOpsAction``.
-
-Requires ``OPENAI_API_KEY``. Model defaults to ``gemini-2.5-flash`` (override with ``OPENAI_MODEL``).
-"""
-
-from __future__ import annotations
-
-import json
-import os
-import sys
+import json, os, sys, asyncio
+from openai import OpenAI
 from typing import Any, Literal, Optional
 from uuid import uuid4
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from openai import OpenAI
-
-# Line Buffering: Critical for real-time log streaming
+# Force hardware-level unbuffering
 sys.stdout.reconfigure(line_buffering=True)
-
-# Naked Logger - ignores all buffering
-def force_log(message):
-    sys.stdout.write(f"{message}\n")
-    sys.stdout.flush()
-    os.fsync(sys.stdout.fileno()) # Forces hardware to write NOW
-
-# Check for required API key at script startup
-api_key = os.getenv('HF_TOKEN') or os.getenv('OPENAI_API_KEY')
-# No debug output - only tags should be printed
-
 
 class SecurityStatus(str, Enum):
     """Posture for SSH / port 22 exposure."""
     SECURE = "secure"
     SSH_EXPOSED_WORLD = "ssh_exposed_world"  # Port 22 bound to 0.0.0.0/0
-
 
 class Server:
     """One fleet member (virtual server)."""
@@ -82,7 +53,6 @@ class Server:
             "ssh_listens_on": self.ssh_listens_on,
         }
 
-
 class CloudOpsAction:
     """Agent command for fleet operations."""
 
@@ -102,7 +72,6 @@ class CloudOpsAction:
             "server_id": self.server_id,
             "instance_tier": self.instance_tier,
         }
-
 
 class CloudOpsObservation:
     """Observable fleet state and grading hints."""
@@ -124,7 +93,6 @@ class CloudOpsObservation:
         self.grader_scores = grader_scores or {}
         self.done = done
         self.reward = reward
-
 
 SYSTEM_PROMPT = """You are a cloud operations and security auditor.
 
@@ -151,7 +119,6 @@ Output format: {"command": "...", "server_id": "...", "instance_tier": "standard
 - `instance_tier` is only used with `set_instance_tier` (still include it in the JSON).
 """
 
-
 def observation_to_prompt(obs: CloudOpsObservation) -> str:
     payload: dict[str, Any] = {
         "summary_message": obs.summary_message,
@@ -162,19 +129,16 @@ def observation_to_prompt(obs: CloudOpsObservation) -> str:
     }
     return json.dumps(payload, indent=2)
 
-
 def _parse_action_or_error(text: str) -> CloudOpsAction:
     """Parse LLM response, falling back to noop if JSON is malformed."""
     try:
         data = json.loads(text)
         return CloudOpsAction(**data)
     except Exception as e:
-        print(f"Error parsing action: {e}", flush=True)
         return CloudOpsAction(command="noop", server_id="", instance_tier="standard")
 
-
 def _validate_action_or_error(obs: CloudOpsObservation, action: CloudOpsAction) -> str | None:
-    """Return an error string if the action is invalid for the current observation."""
+    """Return an error string if action is invalid for current observation."""
     if action.command == "noop":
         return None
     if action.command == "terminate_server":
@@ -205,7 +169,6 @@ def _validate_action_or_error(obs: CloudOpsObservation, action: CloudOpsAction) 
         return f"Server {action.server_id} not found"
     return f"Error: Unsupported command {action.command!r}"
 
-
 def select_action(
     obs: CloudOpsObservation,
     client: OpenAI | None = None,
@@ -222,6 +185,7 @@ def select_action(
 
     for _ in range(max_retries):
         user_content = base_user_content
+
         if last_error:
             user_content = (
                 f"{base_user_content}\n\nValidation feedback from the environment:\n{last_error}\n"
@@ -244,162 +208,54 @@ def select_action(
     # If we get here, keep going with a safe noop rather than crashing.
     return CloudOpsAction(command="noop", server_id="", instance_tier="standard")
 
-
-class CloudOpsEnv:
-    """Client for the Cloud Ops & Security Auditor environment."""
-
-    def __init__(self, base_url: str):
-        self.base_url = base_url
-        self._session = None
-
-    async def __aenter__(self):
-        import aiohttp
-        self._session = aiohttp.ClientSession()
-        await self.connect()
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self._session:
-            await self._session.close()
-
-    async def connect(self):
-        """Establish WebSocket connection."""
-        import asyncio
-        import websockets
-        
-        self._ws_url = self.base_url.replace("http://", "ws://").replace("https://", "wss://") + "/ws"
-        try:
-            self._ws = await asyncio.wait_for(websockets.connect(self._ws_url), timeout=10)
-        except Exception as e:
-            raise ConnectionError(f"Failed to connect to {self._ws_url}: {e}") from e
-
-    async def reset(self, seed: int = 0):
-        """Reset environment and return initial observation."""
-        reset_msg = {"type": "reset", "seed": seed}
-        await self._ws.send(json.dumps(reset_msg))
-        response = await self._ws.recv()
-        data = json.loads(response)
-        
-        obs_data = data.get("observation", {})
-        observation = CloudOpsObservation(
-            summary_message=obs_data.get("summary_message", ""),
-            servers=[Server(**s) for s in obs_data.get("servers", [])],
-            current_cost_performance_ratio=obs_data.get("current_cost_performance_ratio", 0.0),
-            target_cost_performance_ratio=obs_data.get("target_cost_performance_ratio", 0.0),
-            grader_scores=obs_data.get("grader_scores", {}),
-            done=data.get("done", False),
-            reward=data.get("reward", 0.0),
-        )
-        
-        from types import SimpleNamespace
-        return SimpleNamespace(observation=observation)
-
-    async def step(self, action: CloudOpsAction):
-        """Execute action and return result."""
-        step_msg = {
-            "type": "step",
-            "action": action.model_dump(mode="json")
-        }
-        await self._ws.send(json.dumps(step_msg))
-        response = await self._ws.recv()
-        data = json.loads(response)
-        
-        obs_data = data.get("observation", {})
-        observation = CloudOpsObservation(
-            summary_message=obs_data.get("summary_message", ""),
-            servers=[Server(**s) for s in obs_data.get("servers", [])],
-            current_cost_performance_ratio=obs_data.get("current_cost_performance_ratio", 0.0),
-            target_cost_performance_ratio=obs_data.get("target_cost_performance_ratio", 0.0),
-            grader_scores=obs_data.get("grader_scores", {}),
-            done=data.get("done", False),
-            reward=data.get("reward", 0.0),
-        )
-        
-        from types import SimpleNamespace
-        return SimpleNamespace(observation=observation, reward=data.get("reward", 0.0), done=data.get("done", False))
-
-
-def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
-    """Connect to a running OpenEnv server and roll out one greedy LLM episode (async loop)."""
-    import asyncio
+async def run_logic(base_url: str):
+    import aiohttp, websockets
     
-    # Verify URL is properly passed and not hardcoded
-    # Critical Networking: use http://0.0.0.0:8000 for internal Docker communication
-    if not base_url or base_url == "http://127.0.0.1:8000":
-        base_url = "http://0.0.0.0:8000"
-        # Using internal Docker URL
-        pass
-
-    async def _run() -> None:
-        rewards_list = []
-        total_steps = 0
-        success = False
-        
-        try:
-            async with CloudOpsEnv(base_url=base_url) as env:
-                result = await env.reset(seed=seed)
-                
-                for t in range(max_steps):
-                    try:
-                        action = select_action(result.observation)
-                        action_str = f"{action.command}|{action.server_id}|{action.instance_tier}"
-                        result = await env.step(action)
-                        rewards_list.append(result.reward)
-                        total_steps = t + 1
-                        success = result.done
-                        # Scaler stdout compliance
-                        error = "false" if result.reward >= 0 else "negative_reward"
-                        force_log(f"[STEP] step={t+1} reward={result.reward:.2f}")
-                        if result.done:
-                            break
-                    except Exception as step_error:
-                        error = "true"
-                        force_log(f"[STEP] step={t+1} action=error reward=0.00 done=false error={error}")
-                        rewards_list.append(0.0)
-                        total_steps = t + 1
-                        continue
-        
-        except Exception as e:
-            # Let finally shield handle the end tag
-            pass
-        
-        # Always print END tag with actual episode results
-        score = sum(rewards_list)
-        force_log(f"[END] task=cloud_ops score={score:.2f} steps={total_steps}")
-
-    try:
-        asyncio.run(_run())
-    except KeyboardInterrupt:
-        # Episode stopped by user
-        pass
-    except Exception as loop_error:
-        # Async loop failed
-        pass
-
-
-def main():
-    """Main function that can be called by the validator."""
-    import sys
+    # 1. THE START TAG - First line of output
+    print(f'[START] task=cloud_ops', flush=True)
     
-    url = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000"
-    run_episode_demo(url)
-
-
-def run(base_url: str):
-    """Run function that accepts base_url parameter for validator."""
-    # The Finally Shield - wrap entire logic in try...finally
-    rewards_list = []
-    total_steps = 0
+    rewards = []
+    steps = 0
     success = False
     
     try:
-        run_episode_demo(base_url)
-        # Get actual results from episode (will be set by run_episode_demo)
-        # Note: These will be updated by the actual episode execution
-    except Exception as e:
-        # Episode failed, use default values
+        ws_url = base_url.replace("http", "ws") + "/ws"
+        async with websockets.connect(ws_url) as ws:
+            # Reset environment
+            await ws.send(json.dumps({"type": "reset", "seed": 0}))
+            res = json.loads(await ws.recv())
+            obs_data = res.get("observation", {})
+            
+            # Agent Loop (Max 20 steps)
+            for t in range(20):
+                # Process observation
+                obs = CloudOpsObservation(**obs_data)
+                obs.servers = [Server(**s) for s in obs_data.get("servers", [])]
+                
+                # Get and execute action
+                action = select_action(obs)
+                await ws.send(json.dumps({"type": "step", "action": action.model_dump()}))
+                
+                # Parse response
+                step_res = json.loads(await ws.recv())
+                obs_data = step_res.get("observation", {})
+                reward = step_res.get("reward", 0.0)
+                done = step_res.get("done", False)
+                
+                rewards.append(reward)
+                steps = t + 1
+                success = done
+                
+                # 2. THE STEP TAG - Clean and precise
+                print(f'[STEP] step={steps} reward={reward:.2f} done={str(done).lower()}', flush=True)
+                if done: break
+    except Exception:
         pass
     finally:
-        # Always print END tag with actual episode results
-        score = sum(rewards_list)
-        force_log(f"[END] task=cloud_ops score={score:.2f} steps={total_steps}")
+        # 3. THE END TAG - Exactly one, guaranteed by 'finally'
+        score = sum(rewards)
+        print(f'[END] task=cloud_ops score={score:.2f} steps={steps}', flush=True)
+
+def run(base_url: str):
+    # Bridge between FastAPI and async logic
+    asyncio.run(run_logic(base_url))
