@@ -47,7 +47,7 @@ import os
 os.environ.setdefault('PYTHONUNBUFFERED', '1')
 
 # Import classes from root directory
-from inference import CloudOpsAction, CloudOpsObservation, run
+from inference import CloudOpsAction, CloudOpsObservation, run, force_log
 import env
 
 # Create the app with web interface and README integration
@@ -63,6 +63,9 @@ app = create_app(
 @app.post('/reset')
 async def reset_endpoint(request: dict = None):
     """Reset endpoint that triggers inference logic."""
+    # Crucial: START tag at very first line - validator sees tag immediately
+    force_log(f"[START] task=cloud_ops")
+    
     try:
         # CRITICAL: Call run function to trigger inference logic
         # Use asyncio to avoid blocking FastAPI event loop
