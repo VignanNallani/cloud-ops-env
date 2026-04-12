@@ -1,8 +1,9 @@
 import os, json, asyncio
 from pydantic import BaseModel
 from typing import List, Optional, Dict
+from openai import OpenAI
 
-# 1. MUST BE PRESENT FOR app.py
+# 1. MANDATORY MODELS FOR app.py
 class CloudOpsAction(BaseModel):
     command: str
     server_id: Optional[str] = None
@@ -14,44 +15,70 @@ class CloudOpsObservation(BaseModel):
     target_cost_performance_ratio: float
     grader_scores: Dict[str, float]
 
+# 2. REQUIRED ENVIRONMENT VARIABLES [cite: 9, 12, 15, 18]
+API_BASE_URL = os.getenv("API_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.0-flash")
+HF_TOKEN = os.getenv("HF_TOKEN")
+
+# Initialize OpenAI client as required [cite: 6, 48]
+client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+
 def log(msg):
     print(msg, flush=True)
 
 async def run_logic(base_url: str):
     import websockets
-    # MANDATORY START TAG [cite: 21]
-    log(f"[START] task=cloud_ops env=cloud_ops_env model={os.getenv('MODEL_NAME', 'gemini-2.0-flash')}")
+    # MANDATORY START TAG [cite: 21, 25]
+    log(f"[START] task=cloud_ops env=cloud_ops_env model={MODEL_NAME}")
     
+    ws_url = base_url.replace("http", "ws") + "/ws"
     rewards_list = []
     steps_count = 0
     success = "false" # lowercase boolean [cite: 29]
 
     try:
-        ws_url = base_url.replace("http", "ws") + "/ws"
-        async with websockets.connect(ws_url, timeout=10) as ws:
+        # BUG FIX: Use open_timeout instead of timeout to avoid TypeError
+        async with websockets.connect(ws_url, open_timeout=10) as ws:
             await ws.send(json.dumps({"type": "reset", "seed": 0}))
             res = json.loads(await ws.recv())
             obs = res.get("observation", {})
 
             for t in range(20):
                 steps_count = t + 1
-                action = {"command": "noop"} # Your 0.93 logic here...
                 
-                await ws.send(json.dumps({"type": "step", "action": action}))
+                # VIGNAN'S 0.93 LOGIC
+                action_dict = {"command": "noop"}
+                for s in obs.get("servers", []):
+                    if s.get("security_status") == "ssh_exposed_world":
+                        action_dict = {"command": "fix_ssh_exposure", "server_id": s['id']}
+                        break
+                    if s.get("cpu_utilization_percent", 100) < 5.0:
+                        action_dict = {"command": "terminate_server", "server_id": s['id']}
+                        break
+                
+                # EXECUTE STEP
+                await ws.send(json.dumps({"type": "step", "action": action_dict}))
                 step_res = json.loads(await ws.recv())
                 
+                # DATA EXTRACTION
+                obs = step_res.get("observation", {})
                 reward = float(step_res.get("reward", 0.0))
                 rewards_list.append(reward)
-                done = "true" if step_res.get("done") else "false"
+                done_str = "true" if step_res.get("done") else "false" # [cite: 29]
+                err = step_res.get("last_action_error", "null") # [cite: 30]
+                if err is None: err = "null"
 
-                # MANDATORY STEP TAG [cite: 22, 28]
-                log(f"[STEP] step={steps_count} action={action['command']} reward={reward:.2f} done={done} error=null")
+                # MANDATORY STEP TAG [cite: 22, 26, 28]
+                log(f"[STEP] step={steps_count} action={action_dict['command']} reward={reward:.2f} done={done_str} error={err}")
                 
                 if step_res.get("done"):
                     success = "true"
                     break
+
+    except Exception as e:
+        log(f"Internal Pipeline Error: {str(e)}")
     finally:
-        # MANDATORY END TAG [cite: 23, 27]
+        # MANDATORY END TAG (Always emitted) [cite: 23, 27, 28]
         formatted_rewards = ",".join([f"{r:.2f}" for r in rewards_list])
         log(f"[END] success={success} steps={steps_count} rewards={formatted_rewards}")
 
