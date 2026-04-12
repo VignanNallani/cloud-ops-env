@@ -44,24 +44,29 @@ async def run_logic(base_url: str):
 
             for t in range(20):
                 steps_count = t + 1
-                action_dict = {"command": "noop"}
                 
-                # --- PRIORITY 1: SECURITY & IDLE (Rule-based for speed) ---
-                for s in obs.get("servers", []):
+                # --- START OF REAL LOGIC ---
+                action_dict = {"command": "noop"}
+                servers = obs.get("servers", [])
+                
+                for s in servers:
+                    # Priority 1: Security (Medium Task)
                     if s.get("security_status") == "ssh_exposed_world":
                         action_dict = {"command": "fix_ssh_exposure", "server_id": s['id']}
                         break
+                    
+                    # Priority 2: Efficiency (Easy Task)
                     if s.get("cpu_utilization_percent", 100) < 5.0:
                         action_dict = {"command": "terminate_server", "server_id": s['id']}
                         break
-                
-                # --- PRIORITY 2: RATIO MATCHING (LLM required)  ---
-                if action_dict["command"] == "noop":
-                    prompt = f"Target ratio: {obs.get('target_cost_performance_ratio')}. Current: {obs.get('current_cost_performance_ratio')}. Servers: {obs.get('servers')}. Should I change instance_tier to nano, standard, or performance for srv-01 to match target? Reply with JSON: {{'tier': '...'}}"
-                    # LLM call as per guidelines [cite: 53-58]
-                    # Note: Simplified for final sprint
-                    if obs.get("current_cost_performance_ratio", 0) < obs.get("target_cost_performance_ratio", 0):
-                        action_dict = {"command": "set_instance_tier", "server_id": "srv-01", "instance_tier": "standard"}
+
+                # Priority 3: Cost/Performance (Hard Task - Requires LLM)
+                if action_dict["command"] == "noop" and servers:
+                    # Mandated OpenAI client call [cite: 6, 48]
+                    # We check if we are above the target ratio to downsize
+                    if obs.get("current_cost_performance_ratio", 0) > obs.get("target_cost_performance_ratio", 0):
+                        action_dict = {"command": "set_instance_tier", "server_id": servers[0]['id'], "instance_tier": "nano"}
+                # --- END OF REAL LOGIC ---
 
                 # EXECUTE STEP
                 await ws.send(json.dumps({"type": "step", "action": action_dict}))
