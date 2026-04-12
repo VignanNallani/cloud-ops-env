@@ -211,9 +211,6 @@ def select_action(
 async def run_logic(base_url: str):
     import aiohttp, websockets
     
-    # 1. THE START TAG - First line of output
-    print(f'[START] task=cloud_ops', flush=True)
-    
     rewards = []
     steps = 0
     success = False
@@ -246,13 +243,13 @@ async def run_logic(base_url: str):
                 steps = t + 1
                 success = done
                 
-                # 2. THE STEP TAG - Clean and precise
+                # THE STEP TAG - Clean and precise
                 print(f'[STEP] step={steps} reward={reward:.2f} done={str(done).lower()}', flush=True)
                 if done: break
     except Exception:
         pass
     finally:
-        # 3. THE END TAG - Exactly one, guaranteed by 'finally'
+        # THE END TAG - Exactly one, guaranteed by 'finally'
         score = sum(rewards)
         print(f'[END] task=cloud_ops score={score:.2f} steps={steps}', flush=True)
 
