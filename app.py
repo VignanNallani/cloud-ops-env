@@ -63,7 +63,7 @@ app = create_app(
 @app.post('/reset')
 async def reset_endpoint(request: dict = None):
     """Reset endpoint that triggers inference logic."""
-    # Crucial: START tag at very first line - validator sees tag immediately
+    # Crucial: START tag outside of any thread - very first thing that happens
     force_log(f"[START] task=cloud_ops")
     
     try:
@@ -99,8 +99,8 @@ def main(host: str = "0.0.0.0", port: int = 8000):
     """
     import uvicorn
 
-    # Gold Standard: Disable all uvicorn and FastAPI default logging
-    uvicorn.run(app, host=host, port=port, log_config=None)
+    # Gold Standard: Silence all INFO logs - only errors
+    uvicorn.run(app, host=host, port=port, log_level="error")
 
 
 if __name__ == "__main__":

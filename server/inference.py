@@ -25,16 +25,15 @@ from openai import OpenAI
 # Line Buffering: Critical for real-time log streaming
 sys.stdout.reconfigure(line_buffering=True)
 
-# Lowest-level system call to force text to validator's pipe
+# Naked Logger - ignores all buffering
 def force_log(message):
-    # Write directly to system file descriptor 1 (STDOUT)
-    os.write(1, f"{message}\n".encode('utf-8'))
+    sys.stdout.write(f"{message}\n")
+    sys.stdout.flush()
+    os.fsync(sys.stdout.fileno()) # Forces hardware to write NOW
 
 # Check for required API key at script startup
 api_key = os.getenv('HF_TOKEN') or os.getenv('OPENAI_API_KEY')
-if not api_key:
-    # Resilient Auth - don't exit, just debug
-    print(f"DEBUG: HF_TOKEN or OPENAI_API_KEY not set, proceeding without API key", flush=True)
+# No debug output - only tags should be printed
 
 
 class SecurityStatus(str, Enum):
@@ -388,9 +387,6 @@ def main():
 
 def run(base_url: str):
     """Run function that accepts base_url parameter for validator."""
-    # Environment Variable Debug
-    print(f"DEBUG: HF_TOKEN present: {bool(os.getenv('HF_TOKEN'))}", flush=True)
-    
     # The Finally Shield - wrap entire logic in try...finally
     rewards_list = []
     total_steps = 0
