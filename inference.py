@@ -345,12 +345,12 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
                         success = result.done
                         # Scaler stdout compliance
                         error = "false" if result.reward >= 0 else "negative_reward"
-                        print(f"[STEP] step={t+1} reward={result.reward:.2f}", flush=True)
+                        print(f"[STEP] step={t+1} reward={result.reward:.2f}", file=sys.__stdout__, flush=True)
                         if result.done:
                             break
                     except Exception as step_error:
                         error = "true"
-                        print(f"[STEP] step={t+1} action=error reward=0.00 done=false error={error}", flush=True)
+                        print(f"[STEP] step={t+1} action=error reward=0.00 done=false error={error}", file=sys.__stdout__, flush=True)
                         rewards_list.append(0.0)
                         total_steps = t + 1
                         continue
@@ -361,7 +361,7 @@ def run_episode_demo(base_url: str, seed: int = 0, max_steps: int = 20) -> None:
         
         # Always print END tag with actual episode results
         score = sum(rewards_list)
-        print(f"[END] task=cloud_ops score={score:.2f} steps={total_steps}", flush=True)
+        print(f"[END] task=cloud_ops score={score:.2f} steps={total_steps}", file=sys.__stdout__, flush=True)
 
     try:
         asyncio.run(_run())
@@ -384,7 +384,7 @@ def main():
 def run(base_url: str):
     """Run function that accepts base_url parameter for validator."""
     # The Immediate Step: START tag before any imports or complex logic
-    print(f"[START] task=cloud_ops", flush=True)
+    print(f"[START] task=cloud_ops", file=sys.__stdout__, flush=True)
     
     # Environment Variable Debug
     print(f"DEBUG: HF_TOKEN present: {bool(os.getenv('HF_TOKEN'))}", flush=True)
@@ -404,4 +404,4 @@ def run(base_url: str):
     finally:
         # Always print END tag with actual episode results
         score = sum(rewards_list)
-        print(f"[END] task=cloud_ops score={score:.2f} steps={total_steps}", flush=True)
+        print(f"[END] task=cloud_ops score={score:.2f} steps={total_steps}", file=sys.__stdout__, flush=True)
