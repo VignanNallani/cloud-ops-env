@@ -17,7 +17,7 @@ class CloudOpsObservation(BaseModel):
 
 # 2. REQUIRED ENVIRONMENT VARIABLES [cite: 9-18]
 API_BASE_URL = os.getenv("API_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
-MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.5-flash")
+MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.0-flash")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 # 3. INITIALIZE OPENAI CLIENT [cite: 47-51]
@@ -28,75 +28,50 @@ def log(msg):
 
 async def run_logic(base_url: str):
     import websockets
-    # [START] TAG - Mandatory Fields [cite: 21, 25]
+    # [START] TAG [cite: 21, 25]
     log(f"[START] task=cloud_ops env=cloud_ops_env model={MODEL_NAME}")
     
     ws_url = base_url.replace("http", "ws") + "/ws"
     rewards_list = []
     steps_count = 0
-    success = "false" # lowercase boolean [cite: 29]
+    success = "false"
 
     try:
-        async with websockets.connect(ws_url, open_timeout=10) as ws:
-            # Episode Begin [cite: 25]
+        async with websockets.connect(ws_url, open_timeout=15) as ws:
             await ws.send(json.dumps({"type": "reset", "seed": 0}))
             res = json.loads(await ws.recv())
             obs = res.get("observation", {})
 
             for t in range(20):
                 steps_count = t + 1
-                
-                # --- START OF AGGRESSIVE AGENT LOGIC ---
-                action_dict = {"command": "noop"}
                 servers = obs.get("servers", [])
                 
-                # Priority1: Security First (Medium Task)
-                for s in servers:
-                    if s.get("security_status") == "ssh_exposed_world":
-                        action_dict = {"command": "fix_ssh_exposure", "server_id": s['id']}
-                        break
+                # --- MANDATORY LLM DECISION MAKING [cite: 6, 52-60] ---
+                # We ask the LLM to analyze the state and provide the next best action
+                prompt = f"System State: {json.dumps(obs)}. Provide the next command (fix_ssh_exposure, terminate_server, or set_instance_tier) to optimize cost and security. Return ONLY a JSON object: {{'command': '...', 'server_id': '...'}}"
                 
-                # Priority 2: Waste Cleanup (Easy Task)
-                if action_dict["command"] == "noop":
-                    for s in servers:
-                        if s.get("cpu_utilization_percent", 100) < 5.0:
-                            action_dict = {"command": "terminate_server", "server_id": s['id']}
-                            break
+                response = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"}
+                )
+                
+                action_dict = json.loads(response.choices[0].message.content)
 
-                # Priority3: Ratio Matching (Hard Task - Using LLM for decision)
-                if action_dict["command"] == "noop" and servers:
-                    # Instead of hardcoded if/else, let's LLM decide the tier
-                    curr = obs.get("current_cost_performance_ratio", 0)
-                    tgt = obs.get("target_cost_performance_ratio", 0)
-                    
-                    response = client.chat.completions.create(
-                        model=MODEL_NAME,
-                        messages=[{"role": "user", "content": f"Target ratio is {tgt:.2f}. Current is {curr:.2f}. Which tier (nano, standard, performance) should I pick? Respond with JSON only: {{'tier': '...'}}"}],
-                        max_tokens=50
-                    )
-                    
-                    try:
-                        llm_response = response.choices[0].message.content.strip()
-                        tier_decision = json.loads(llm_response).get("tier", "standard")
-                        action_dict = {"command": "set_instance_tier", "server_id": servers[0]['id'], "instance_tier": tier_decision}
-                    except:
-                        action_dict = {"command": "set_instance_tier", "server_id": servers[0]['id'], "instance_tier": "standard"}
-                # --- END OF AGGRESSIVE AGENT LOGIC ---
-
-                # Execute Step [cite: 26]
+                # --- EXECUTE STEP ---
                 await ws.send(json.dumps({"type": "step", "action": action_dict}))
                 step_res = json.loads(await ws.recv())
                 
-                # Update State
+                # --- UPDATE STATE & LOGGING ---
                 obs = step_res.get("observation", {})
                 reward = float(step_res.get("reward", 0.0))
                 rewards_list.append(reward)
-                done_bool = "true" if step_res.get("done") else "false" # lowercase [cite: 29]
-                err = step_res.get("last_action_error", "null") # cite: 30]
+                done_bool = "true" if step_res.get("done") else "false" [cite: 29]
+                err = step_res.get("last_action_error", "null") [cite: 30]
                 if err is None: err = "null"
 
-                # [STEP] TAG - 2-decimal precision [cite: 22, 26, 28]
-                log(f"[STEP] step={steps_count} action={action_dict['command']} reward={reward:.2f} done={done_bool} error={err}")
+                # [STEP] TAG [cite: 22, 28]
+                log(f"[STEP] step={steps_count} action={action_dict.get('command', 'noop')} reward={reward:.2f} done={done_bool} error={err}")
                 
                 if step_res.get("done"):
                     success = "true"
@@ -105,7 +80,7 @@ async def run_logic(base_url: str):
     except Exception as e:
         log(f"Pipeline Error: {str(e)}")
     finally:
-        # [END] TAG - Comma separated 2-decimal rewards [cite: 23, 27, 28]
+        # [END] TAG [cite: 23, 27, 28]
         formatted_rewards = ",".join([f"{r:.2f}" for r in rewards_list])
         log(f"[END] success={success} steps={steps_count} rewards={formatted_rewards}")
 
