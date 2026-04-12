@@ -110,6 +110,8 @@ class CloudOpsObservation(Observation):
         default_factory=dict,
         description="Per-task achievement in [0, 1] (easy, medium, hard)",
     )
+    reward: float = Field(default=0.0) # ADD THIS
+    done: bool = Field(default=False)   # ADD THIS
 
 
 # --- Graders -----------------------------------------------------------------
@@ -267,8 +269,8 @@ class CloudOpsEnvironment(Environment[CloudOpsAction, CloudOpsObservation, State
                 self._ctx.get("target_cost_performance_ratio", 0.0)
             ),
             grader_scores=scores,
-            done=done,
-            reward=reward,
+            reward=reward, # ADD THIS
+            done=done,      # ADD THIS
             metadata={
                 "action_feedback": feedback,
                 "grader_scores": scores,
