@@ -20,11 +20,17 @@ API_BASE_URL = os.getenv("API_BASE_URL", "https://generativelanguage.googleapis.
 MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.0-flash")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-# 3. INITIALIZE OPENAI CLIENT [cite: 47-51]
-client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
-
 def log(msg):
     print(msg, flush=True)
+
+# Ensure this check is at the top of your script
+if not HF_TOKEN:
+    # This prevents the 400 error by stopping the script before the call
+    log("CRITICAL ERROR: HF_TOKEN environment variable is missing in Space Settings!")
+    raise ValueError("HF_TOKEN is mandatory")
+
+# 3. INITIALIZE OPENAI CLIENT [cite: 47-51]
+client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
 
 async def run_logic(base_url: str):
     import websockets
